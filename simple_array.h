@@ -19,7 +19,7 @@
  *   - array_capacity(arr):                   Returns the total capacity of the array.
  *   - array_growth_factor(arr):              Returns the current growth factor.
  *   - array_push(arr, item):                 Appends an item to the array.
- *   - array_pop(arr, out):                   Removes the last item from the array and outputs it.
+ *   - array_pop(arr):                        Removes the last item from the array and returns it.
  *   - array_delete(arr, index):              Deletes the element at the specified index.
  *   - array_set_min_capacity(arr, min_cap):  Ensures the array has at least min_cap capacity.
  *   - array_set_growth_factor(arr, factor):  Sets the array's growth factor.
@@ -117,22 +117,19 @@ typedef struct {
         (arr) = _a;                                                                                                                    \
     } while (0)
 
-/* Remove the last item from the array and output it to 'out'. */
-#define array_pop(arr, out)                                                            \
-    do {                                                                               \
+/* Remove the last item from the array and return it. */
+#define array_pop(arr)                                                                 \
+    ({                                                                                 \
+        __typeof__(*(arr)) _pop_val = 0; /* default value */                           \
         __typeof__(arr) _a = (arr);                                                    \
         if (_a) {                                                                      \
             array_header *_hdr = ARRAY_HEADER(_a);                                     \
             if (_hdr->count > 0) {                                                     \
-                (out) = _a[_hdr->count - 1];                                           \
-                _hdr->count--;                                                         \
-            } else {                                                                   \
-                (out) = 0;                                                             \
+                _pop_val = _a[--_hdr->count];                                          \
             }                                                                          \
-        } else {                                                                       \
-            (out) = 0;                                                                 \
         }                                                                              \
-    } while (0)
+        _pop_val;                                                                      \
+    })
 
 /* Delete the element at the specified index, shifting subsequent elements. */
 #define array_delete(arr, index)                                                                    \
