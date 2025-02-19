@@ -67,10 +67,10 @@ typedef struct {
 #define ARRAY_RESIZE(arr, new_cap)                                                                               \
     do {                                                                                                         \
         _Static_assert(__builtin_types_compatible_p(__typeof__(new_cap), size_t), "new_cap must be size_t");     \
-        __typeof__(arr) _a = (arr);                                                                              \
-        size_t _elem_size = sizeof(*(_a));                                                                       \
-        size_t _header_size = ARRAY_HEADER_SIZE(_a);                                                             \
-        array_header *_old_hdr = _a ? ARRAY_HEADER(_a) : NULL;                                                   \
+        __typeof__(arr) _ar = (arr);                                                                             \
+        size_t _elem_size = sizeof(*(_ar));                                                                      \
+        size_t _header_size = ARRAY_HEADER_SIZE(_ar);                                                            \
+        array_header *_old_hdr = _ar ? ARRAY_HEADER(_ar) : NULL;                                                 \
         size_t _old_count = _old_hdr ? _old_hdr->count : 0;                                                      \
         array_header *_new_hdr = (array_header *)malloc(_header_size + (new_cap) * _elem_size);                  \
         _new_hdr->capacity = (new_cap);                                                                          \
@@ -78,7 +78,7 @@ typedef struct {
         _new_hdr->growth_factor = _old_hdr ? _old_hdr->growth_factor : ARRAY_GROWTH_FACTOR_DEFAULT;              \
         void *_new_arr = (char *)_new_hdr + _header_size;                                                        \
         if (_old_hdr) {                                                                                          \
-            memcpy(_new_arr, _a, _old_count * _elem_size);                                                       \
+            memcpy(_new_arr, _ar, _old_count * _elem_size);                                                      \
             free((char *)_old_hdr);                                                                              \
         }                                                                                                        \
         (arr) = _new_arr;                                                                                        \
