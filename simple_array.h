@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <assert.h>
 
 #ifndef ARRAY_INIT_CAPACITY
 #define ARRAY_INIT_CAPACITY 16
@@ -43,10 +44,13 @@
 #define ARRAY_GROWTH_FACTOR_DEFAULT 2.0
 #endif
 
+#define ARRAY_MAGIC_NUMBER 0xd1a1e159
+
 typedef struct {
+    double growth_factor;
     size_t count;
     size_t capacity;
-    double growth_factor;
+    uint32_t magic_number; // Used to assert that the header is valid
 } array_header;
 
 /* Compute the header size rounded up to the alignment of the element type */
@@ -54,7 +58,11 @@ typedef struct {
     (((sizeof(array_header) + __alignof__(*(arr)) - 1) / __alignof__(*(arr))) * __alignof__(*(arr)))
 
 /* Given a pointer to the user array, get a pointer to the hidden header */
-#define ARRAY_HEADER(arr) ((array_header *)((char *)(arr) - ARRAY_HEADER_SIZE(arr)))
+#define ARRAY_HEADER(arr) ({                                                           \
+    array_header *hdr = ((array_header *)((char *)(arr) - ARRAY_HEADER_SIZE(arr)));    \
+    assert(hdr->magic_number == ARRAY_MAGIC_NUMBER);                                   \
+    hdr;                                                                               \
+})
 
 /* Query macros */
 #define array_count(arr)         ((arr) ? ARRAY_HEADER(arr)->count : 0)
@@ -76,6 +84,7 @@ typedef struct {
         _new_hdr->capacity = (new_cap);                                                                          \
         _new_hdr->count = _old_count;                                                                            \
         _new_hdr->growth_factor = _old_hdr ? _old_hdr->growth_factor : ARRAY_GROWTH_FACTOR_DEFAULT;              \
+        _new_hdr->magic_number = ARRAY_MAGIC_NUMBER;                                                             \
         void *_new_arr = (char *)_new_hdr + _header_size;                                                        \
         if (_old_hdr) {                                                                                          \
             memcpy(_new_arr, _ar, _old_count * _elem_size);                                                      \
@@ -103,6 +112,7 @@ typedef struct {
             _hdr->capacity = _cap;                                                                                                     \
             _hdr->count = 0;                                                                                                           \
             _hdr->growth_factor = ARRAY_GROWTH_FACTOR_DEFAULT;                                                                         \
+            _hdr->magic_number = ARRAY_MAGIC_NUMBER;                                                                                   \
             _a = (void *)((char *)_hdr + _header_size);                                                                                \
             memset(_a, 0, _cap * _elem_size);                                                                                          \
         }                                                                                                                              \
@@ -160,6 +170,7 @@ typedef struct {
             _hdr->capacity = _m_min_cap;                                                                                                \
             _hdr->count = 0;                                                                                                            \
             _hdr->growth_factor = ARRAY_GROWTH_FACTOR_DEFAULT;                                                                          \
+            _hdr->magic_number = ARRAY_MAGIC_NUMBER;                                                                                    \
             _a = (void *)((char *)_hdr + _header_size);                                                                                 \
             memset(_a, 0, _m_min_cap * _elem_size);                                                                                     \
         } else {                                                                                                                        \
@@ -198,6 +209,7 @@ typedef struct {
                 _new_hdr->count = _orig_hdr->count;                                           \
                 _new_hdr->capacity = _cap;                                                    \
                 _new_hdr->growth_factor = _orig_hdr->growth_factor;                           \
+                _new_hdr->magic_number = ARRAY_MAGIC_NUMBER;                                  \
                 void *_new_arr = (char *)_new_hdr + _header_size;                             \
                 memcpy(_new_arr, _orig, _orig_hdr->count * _elem_size);                       \
                 _dup = _new_arr;                                                              \
