@@ -25,6 +25,7 @@
  *   - array_set_growth_factor(arr, factor):  Sets the array's growth factor.
  *   - array_dup(arr):                        Duplicates the array (shallow copy).
  *   - array_free(arr):                       Frees the array.
+ *   - array_free_free(arr):                  Frees the array, calling free_func for each item.
  *   - array_clear(arr):                      Resets the array's count to zero.
  */
 
@@ -218,14 +219,46 @@ typedef struct {
         _dup;                                                                                 \
     })
 
-/* Free the array and its hidden header. */
-#define array_free(arr)                                                                 \
+/* ------------------------------------------------------------------
+   array_free_free(arr, free_func)
+   Frees the entire array (including its hidden header) and, if provided,
+   calls free_func on every element (from index 0 to count–1) before freeing.
+   - If (arr) is NULL, no action is taken.
+   - The free_func parameter may be provided as either a traditional function
+     pointer or as a block, as long as it accepts a parameter of the element type
+     and returns void.
+   
+   Examples:
+       // Using a function pointer:
+       array_free_free(my_array, my_cleanup_function);
+       // Using a block:
+       array_free_free(my_array, ^(ElementType item) { cleanup(item); });
+       // Without a cleanup callback:
+       array_free_free(my_array, NULL);
+------------------------------------------------------------------ */
+#define array_free_free(arr, free_func)                                                 \
     do {                                                                                \
         if (arr) {                                                                      \
-            free((char *)(arr) - ARRAY_HEADER_SIZE(arr));                               \
+            __typeof__(arr) _aff_arr = (arr);                                           \
+            void (^_aff_free_func)(__typeof__(_aff_arr[0])) =                           \
+                _Generic((free_func),                                                   \
+                    void (*)(__typeof__(_aff_arr[0])): (free_func),                     \
+                    void (^)(__typeof__(_aff_arr[0])): (free_func),                     \
+                    default: ((void (^)(__typeof__(_aff_arr[0])))0)                     \
+                );                                                                      \
+            array_header *_aff_hdr = ARRAY_HEADER(_aff_arr);                            \
+            for (size_t _aff_i = 0; _aff_i < _aff_hdr->count; _aff_i++) {               \
+                if (_aff_free_func) {                                                   \
+                    _aff_free_func(_aff_arr[_aff_i]);                                   \
+                }                                                                       \
+            }                                                                           \
+            free((char *)(_aff_arr) - ARRAY_HEADER_SIZE(_aff_arr));                     \
             (arr) = NULL;                                                               \
         }                                                                               \
     } while (0)
+
+/* Free the array and its hidden header. */
+#define array_free(arr) array_free_free(arr, NULL)
 
 /* Clear the array (set count to zero). */
 #define array_clear(arr)                                                                \

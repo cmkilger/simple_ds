@@ -30,6 +30,7 @@
  *   - map_set_load_factor(tbl, factor):    Sets the map's load factor.
  *   - map_dup(tbl):                        Duplicates the map.
  *   - map_free(tbl):                       Frees the map.
+ *   - map_free_free(tbl):                  Frees the map, calling free_func for each item that exists.
  */
 
 #ifndef SIMPLE_MAP_H
@@ -503,12 +504,50 @@ static inline void map_delete_impl_idx(void *tbl_void, size_t elem_size, size_t 
        _dup; })
 
 /* ------------------------------------------------------------------
+   map_free_free(tbl, free_func)
+   Frees the entire hash map (including its hidden map header) and calls
+   free_func on every bucket with a non-NULL key before freeing.
+   - If (tbl) is NULL, no action is taken.
+   - The free_func parameter may be provided as either a traditional function
+     pointer or as a block, as long as it accepts a single parameter of the
+     element type and returns void.
+   
+   Examples:
+       // Using a function pointer:
+       map_free_free(table, my_cleanup_function);
+       // Using a block:
+       map_free_free(table, ^(Foo item) { free(item.key); });
+       // Without a cleanup callback:
+       map_free_free(table, NULL);
+------------------------------------------------------------------ */
+#define map_free_free(tbl, free_func)                                          \
+    do {                                                                       \
+        if (tbl) {                                                             \
+            __typeof__(tbl) _mff_tbl = (tbl);                                  \
+            void (^_mff_free_func)(__typeof__(_mff_tbl[0])) =                  \
+                _Generic((free_func),                                          \
+                    void (*)(__typeof__(_mff_tbl[0])): (free_func),            \
+                    void (^)(__typeof__(_mff_tbl[0])): (free_func),            \
+                    default: ((void (^)(__typeof__(_mff_tbl[0])))0)            \
+                );                                                             \
+            map_header *_mff_hdr = MAP_HEADER(_mff_tbl);                       \
+            size_t _mff_cap = _mff_hdr->capacity;                              \
+            for (size_t _mff_i = 0; _mff_i < _mff_cap; _mff_i++) {             \
+                if (_mff_tbl[_mff_i].key) {                                    \
+                    if (_mff_free_func) {                                      \
+                        _mff_free_func(_mff_tbl[_mff_i]);                      \
+                    }                                                          \
+                }                                                              \
+            }                                                                  \
+            free((char *)(_mff_tbl) - MAP_HEADER_SIZE(_mff_tbl));              \
+            (tbl) = NULL;                                                      \
+        }                                                                      \
+    } while (0)
+
+/* ------------------------------------------------------------------
    map_free(tbl)
    Frees the entire hash map (including its hidden map header) and sets tbl to NULL.
 ------------------------------------------------------------------ */
-#define map_free(tbl)                                                                 \
-    do {                                                                              \
-       if (tbl) { free((char *)(tbl) - MAP_HEADER_SIZE(tbl)); (tbl) = NULL; }         \
-    } while (0)
+#define map_free(tbl) map_free_free(tbl, NULL)
 
 #endif  /* SIMPLE_MAP_H */
