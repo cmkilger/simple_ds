@@ -131,7 +131,8 @@ typedef struct {
 /* Remove the last item from the array and return it. */
 #define array_pop(arr)                                                                 \
     ({                                                                                 \
-        __typeof__(*(arr)) _pop_val = 0; /* default value */                           \
+        __typeof__(*(arr)) _pop_val; /* Remove the invalid int initializer */          \
+        memset(&_pop_val, 0, sizeof(_pop_val)); /* Zero out memory safely */           \
         __typeof__(arr) _a = (arr);                                                    \
         if (_a) {                                                                      \
             array_header *_hdr = ARRAY_HEADER(_a);                                     \
