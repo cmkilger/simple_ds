@@ -220,6 +220,32 @@ typedef struct {
         _dup;                                                                                 \
     })
 
+/* Duplicate the array (shallow copy). */
+#define array_dup_min_capacity(arr, min_cap)                                                                   \
+    ({                                                                                                         \
+        __typeof__(arr) _orig = (arr);                                                                         \
+        _Static_assert(__builtin_types_compatible_p(__typeof__(min_cap), size_t), "min_cap must be size_t");   \
+        size_t _m_min_cap = (min_cap);                                                                         \
+        __typeof__(arr) _dup = NULL;                                                                           \
+        if (_orig) {                                                                                           \
+            array_header *_orig_hdr = ARRAY_HEADER(_orig);                                                     \
+            size_t _cap = _orig_hdr->capacity;                                                                 \
+            size_t _elem_size = sizeof(*(_orig));                                                              \
+            size_t _header_size = ARRAY_HEADER_SIZE(_orig);                                                    \
+            array_header *_new_hdr = malloc(_header_size + _cap * _elem_size);                                 \
+            if (_new_hdr) {                                                                                    \
+                _new_hdr->count = _orig_hdr->count;                                                            \
+                _new_hdr->capacity = _cap;                                                                     \
+                _new_hdr->growth_factor = _orig_hdr->growth_factor;                                            \
+                _new_hdr->magic_number = ARRAY_MAGIC_NUMBER;                                                   \
+                void *_new_arr = (char *)_new_hdr + _header_size;                                              \
+                memcpy(_new_arr, _orig, _orig_hdr->count * _elem_size);                                        \
+                _dup = _new_arr;                                                                               \
+            }                                                                                                  \
+        }                                                                                                      \
+        _dup;                                                                                                  \
+    })
+
 /* ------------------------------------------------------------------
    array_free_free(arr, free_func)
    Frees the entire array (including its hidden header) and, if provided,
